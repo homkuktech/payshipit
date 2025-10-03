@@ -23,6 +23,9 @@ Paynship is a production-ready logistics and escrow delivery platform built with
 ```
 paynship/
 ├── app/                        # Routes (file-based routing)
+│   ├── (onboarding)/          # Onboarding flow
+│   │   ├── _layout.tsx       # Onboarding stack
+│   │   └── index.tsx         # Feature highlights (6 slides)
 │   ├── (auth)/                # Authentication routes
 │   │   ├── _layout.tsx       # Auth stack navigator
 │   │   ├── login.tsx         # Login screen (email + phone OTP)
@@ -35,7 +38,9 @@ paynship/
 │   │   ├── messages.tsx      # In-app messaging
 │   │   └── profile.tsx       # User profile & settings
 │   ├── _layout.tsx           # Root layout with providers
-│   └── index.tsx             # Entry point with auth check
+│   └── index.tsx             # Entry point with splash & routing
+├── components/                # Reusable components
+│   └── SplashScreen.tsx      # Animated splash screen
 ├── contexts/                  # React Context providers
 │   ├── AuthContext.tsx       # Authentication state
 │   └── ThemeContext.tsx      # Theme (light/dark mode)
@@ -45,7 +50,8 @@ paynship/
 │   ├── database.ts           # Database types
 │   └── env.d.ts              # Environment variables
 ├── hooks/                     # Custom React hooks
-│   └── useFrameworkReady.ts  # Framework initialization
+│   ├── useFrameworkReady.ts  # Framework initialization
+│   └── useOnboarding.ts      # Onboarding state management
 ├── assets/                    # Static assets
 │   └── images/               # App icons
 └── supabase/                  # Database migrations
@@ -133,6 +139,15 @@ All tables have RLS policies:
 - [x] Profile screen with wallet
 - [x] Messages placeholder
 - [x] Dark/Light theme toggle
+
+### ✅ Phase 4.5: Onboarding & UX (COMPLETED)
+
+- [x] Animated splash screen with branding
+- [x] 6-slide onboarding flow showcasing features
+- [x] Onboarding state management with AsyncStorage
+- [x] First-time user flow
+- [x] Skip and navigation controls
+- [x] Smooth animations and transitions
 
 ### 🔄 Phase 5: Orders & Maps (NEXT)
 
@@ -239,6 +254,55 @@ All tables have RLS policies:
 - Dispute resolution
 - Platform analytics
 - System configuration
+
+## User Experience Flow
+
+### First-Time User Journey
+
+```
+App Launch
+    ↓
+Splash Screen (2.5s with animations)
+    ↓
+Onboarding Flow (6 slides)
+    ├─→ Fast & Reliable Delivery
+    ├─→ Secure Escrow Payments
+    ├─→ Live Location Tracking
+    ├─→ Easy Wallet Management
+    ├─→ Quick & Efficient
+    └─→ Trusted Community
+    ↓
+Login/Signup Screen
+    ↓
+Select Role (Sender/Rider/Merchant)
+    ↓
+Create Account
+    ↓
+Main Dashboard
+```
+
+### Returning User Journey
+
+```
+App Launch
+    ↓
+Splash Screen (2.5s)
+    ↓
+Auto-Login (if session active)
+    ↓
+Main Dashboard
+```
+
+### Onboarding Features
+
+- **6 Interactive Slides**: Each highlighting a key app feature
+- **Skip Option**: Users can skip to login anytime
+- **Animated Transitions**: Smooth slide animations
+- **Progress Indicators**: Animated dots showing current slide
+- **Persistent State**: Only shown once using AsyncStorage
+- **Themed**: Adapts to light/dark mode
+
+See `ONBOARDING.md` for detailed documentation.
 
 ## Authentication Flow
 
