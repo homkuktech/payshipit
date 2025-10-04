@@ -145,50 +145,37 @@ export type InvoiceStatus =
 export type RiderMatchStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
 
 export interface Invoice {
-  id: string;
-  merchant_id: string;
-  customer_id?: string;
-  invoice_number: string;
-  status: InvoiceStatus;
-  subtotal: number;
-  delivery_fee: number;
+  id: number;
+  user_id: string;
+  invoice_code: string;
   total_amount: number;
-  payment_reference?: string;
-  paid_at?: string;
-  shipping_address?: string;
-  shipping_lat?: number;
-  shipping_lng?: number;
-  customer_name?: string;
-  customer_phone?: string;
-  customer_email?: string;
-  notes?: string;
-  order_id?: string;
+  payment_status: string;
+  escrow_status: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface InvoiceItem {
-  id: string;
-  invoice_id: string;
-  product_name: string;
-  product_description?: string;
+  id: number;
+  invoice_id: number;
+  description: string;
   quantity: number;
-  unit_price: number;
-  total_price: number;
-  created_at: string;
+  price: number;
 }
 
-export interface InvoiceWithItems extends Invoice {
-  items?: InvoiceItem[];
-  merchant?: Profile;
+export interface Shipment {
+    id: number;
+    invoice_id: number;
+    rider_id: string;
+    status: string;
+    pickup_location: string;
+    delivery_location: string;
+    created_at: string;
 }
 
-export interface RiderMatch {
-  id: string;
-  order_id: string;
-  rider_id: string;
-  distance: number;
-  status: RiderMatchStatus;
-  expires_at: string;
+export interface EscrowTransaction {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  status: string;
   created_at: string;
 }
