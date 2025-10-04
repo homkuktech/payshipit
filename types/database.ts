@@ -133,3 +133,62 @@ export interface RouteInfo {
   duration: number;
   polyline: string;
 }
+
+export type InvoiceStatus =
+  | 'draft'
+  | 'pending_payment'
+  | 'paid'
+  | 'shipped'
+  | 'delivered'
+  | 'cancelled';
+
+export type RiderMatchStatus = 'pending' | 'accepted' | 'rejected' | 'expired';
+
+export interface Invoice {
+  id: string;
+  merchant_id: string;
+  customer_id?: string;
+  invoice_number: string;
+  status: InvoiceStatus;
+  subtotal: number;
+  delivery_fee: number;
+  total_amount: number;
+  payment_reference?: string;
+  paid_at?: string;
+  shipping_address?: string;
+  shipping_lat?: number;
+  shipping_lng?: number;
+  customer_name?: string;
+  customer_phone?: string;
+  customer_email?: string;
+  notes?: string;
+  order_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InvoiceItem {
+  id: string;
+  invoice_id: string;
+  product_name: string;
+  product_description?: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+}
+
+export interface InvoiceWithItems extends Invoice {
+  items?: InvoiceItem[];
+  merchant?: Profile;
+}
+
+export interface RiderMatch {
+  id: string;
+  order_id: string;
+  rider_id: string;
+  distance: number;
+  status: RiderMatchStatus;
+  expires_at: string;
+  created_at: string;
+}
