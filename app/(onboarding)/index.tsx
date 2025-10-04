@@ -50,7 +50,7 @@ export default function OnboardingScreen() {
       id: '2',
       title: 'Secure Escrow Payments',
       description:
-        'Your money is safe with our escrow system. Funds are only released when delivery is confirmed, protecting both senders and riders.',
+        'Your money is safe with our escrow system. Funds are only released when delivery is confirmed, protecting both customers and riders.',
       icon: <Shield size={80} color="#ffffff" strokeWidth={1.5} />,
       color: colors.success,
     },

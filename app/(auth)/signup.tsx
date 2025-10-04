@@ -13,8 +13,15 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { UserPlus } from 'lucide-react-native';
+import { UserPlus, ShoppingBag, Bike, Store } from 'lucide-react-native';
 import { UserRole } from '@/types/database';
+
+interface RoleOption {
+  value: UserRole;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}
 
 export default function SignupScreen() {
   const [fullName, setFullName] = useState('');
@@ -28,6 +35,27 @@ export default function SignupScreen() {
   const { signUpWithEmail } = useAuth();
   const { colors } = useTheme();
   const router = useRouter();
+
+  const roleOptions: RoleOption[] = [
+    {
+      value: 'sender',
+      label: 'Customer',
+      description: 'Send packages',
+      icon: <ShoppingBag size={24} color={role === 'sender' ? '#ffffff' : colors.text} />,
+    },
+    {
+      value: 'rider',
+      label: 'Rider',
+      description: 'Deliver packages',
+      icon: <Bike size={24} color={role === 'rider' ? '#ffffff' : colors.text} />,
+    },
+    {
+      value: 'merchant',
+      label: 'Merchant',
+      description: 'Business account',
+      icon: <Store size={24} color={role === 'merchant' ? '#ffffff' : colors.text} />,
+    },
+  ];
 
   const handleSignup = async () => {
     if (!fullName || !email || !phone || !password || !confirmPassword) {
@@ -45,6 +73,12 @@ export default function SignupScreen() {
       return;
     }
 
+    const phoneRegex = /^\+?[1-9]\d{10,14}$/;
+    if (!phoneRegex.test(phone)) {
+      Alert.alert('Error', 'Please enter a valid phone number (e.g., +2348012345678)');
+      return;
+    }
+
     setLoading(true);
     try {
       await signUpWithEmail(email, password, {
@@ -52,10 +86,10 @@ export default function SignupScreen() {
         phone,
         role,
       });
-      Alert.alert('Success', 'Account created successfully!');
+      Alert.alert('Success', 'Account created successfully! Welcome to Paynship.');
       router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert('Signup Failed', error.message);
+      Alert.alert('Signup Failed', error.message || 'An error occurred during signup');
     } finally {
       setLoading(false);
     }
@@ -68,7 +102,7 @@ export default function SignupScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <UserPlus size={48} color={colors.primary} />
           <Text style={styles.title}>Create Account</Text>
@@ -78,31 +112,41 @@ export default function SignupScreen() {
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>I am a:</Text>
-            <View style={styles.roleToggle}>
-              <TouchableOpacity
-                style={[styles.roleButton, role === 'sender' && styles.roleButtonActive]}
-                onPress={() => setRole('sender')}
-              >
-                <Text style={[styles.roleButtonText, role === 'sender' && styles.roleButtonTextActive]}>
-                  Sender
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleButton, role === 'rider' && styles.roleButtonActive]}
-                onPress={() => setRole('rider')}
-              >
-                <Text style={[styles.roleButtonText, role === 'rider' && styles.roleButtonTextActive]}>
-                  Rider
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleButton, role === 'merchant' && styles.roleButtonActive]}
-                onPress={() => setRole('merchant')}
-              >
-                <Text style={[styles.roleButtonText, role === 'merchant' && styles.roleButtonTextActive]}>
-                  Merchant
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.roleContainer}>
+              {roleOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.roleCard,
+                    role === option.value && styles.roleCardActive,
+                  ]}
+                  onPress={() => setRole(option.value)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.roleIconContainer,
+                    role === option.value && styles.roleIconContainerActive
+                  ]}>
+                    {option.icon}
+                  </View>
+                  <Text
+                    style={[
+                      styles.roleLabel,
+                      role === option.value && styles.roleLabelActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.roleDescription,
+                      role === option.value && styles.roleDescriptionActive,
+                    ]}
+                  >
+                    {option.description}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
           </View>
 
@@ -112,6 +156,7 @@ export default function SignupScreen() {
             placeholderTextColor={colors.textSecondary}
             value={fullName}
             onChangeText={setFullName}
+            autoCapitalize="words"
           />
 
           <TextInput
@@ -122,6 +167,7 @@ export default function SignupScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoComplete="email"
           />
 
           <TextInput
@@ -131,6 +177,7 @@ export default function SignupScreen() {
             value={phone}
             onChangeText={setPhone}
             keyboardType="phone-pad"
+            autoComplete="tel"
           />
 
           <TextInput
@@ -140,6 +187,7 @@ export default function SignupScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            autoComplete="password-new"
           />
 
           <TextInput
@@ -149,12 +197,14 @@ export default function SignupScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
+            autoComplete="password-new"
           />
 
           <TouchableOpacity
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleSignup}
             disabled={loading}
+            activeOpacity={0.8}
           >
             <Text style={styles.buttonText}>
               {loading ? 'Creating Account...' : 'Sign Up'}
@@ -168,6 +218,8 @@ export default function SignupScreen() {
             <Text style={styles.link}>Login</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -202,37 +254,58 @@ const getStyles = (colors: any) =>
       gap: 16,
     },
     inputGroup: {
-      gap: 8,
+      gap: 12,
     },
     label: {
       fontSize: 16,
       fontWeight: '600',
       color: colors.text,
     },
-    roleToggle: {
+    roleContainer: {
       flexDirection: 'row',
-      backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 4,
-      gap: 4,
+      gap: 12,
     },
-    roleButton: {
+    roleCard: {
       flex: 1,
-      paddingVertical: 12,
-      borderRadius: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderRadius: 16,
+      padding: 16,
+      alignItems: 'center',
+      gap: 8,
+    },
+    roleCardActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    roleIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.background,
+      justifyContent: 'center',
       alignItems: 'center',
     },
-    roleButtonActive: {
-      backgroundColor: colors.primary,
+    roleIconContainerActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
     },
-    roleButtonText: {
+    roleLabel: {
       fontSize: 14,
-      color: colors.textSecondary,
-      fontWeight: '500',
-    },
-    roleButtonTextActive: {
-      color: '#ffffff',
       fontWeight: '600',
+      color: colors.text,
+      textAlign: 'center',
+    },
+    roleLabelActive: {
+      color: '#ffffff',
+    },
+    roleDescription: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    roleDescriptionActive: {
+      color: 'rgba(255, 255, 255, 0.8)',
     },
     input: {
       backgroundColor: colors.surface,
@@ -249,6 +322,11 @@ const getStyles = (colors: any) =>
       padding: 16,
       alignItems: 'center',
       marginTop: 8,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
     },
     buttonDisabled: {
       opacity: 0.6,
@@ -273,5 +351,8 @@ const getStyles = (colors: any) =>
       color: colors.primary,
       fontSize: 14,
       fontWeight: '600',
+    },
+    bottomPadding: {
+      height: 40,
     },
   });
