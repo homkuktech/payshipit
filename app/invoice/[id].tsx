@@ -12,17 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import {
-  FileText,
-  Package,
-  MapPin,
-  Phone,
-  Mail,
-  Share2,
-  CreditCard,
-  CheckCircle,
-  Truck,
-} from 'lucide-react-native';
+import { FileText, Package, MapPin, Phone, Mail, Share2, CreditCard, CircleCheck as CheckCircle, Truck } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { InvoiceWithItems, InvoiceItem } from '@/types/database';
 
