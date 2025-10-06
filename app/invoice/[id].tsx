@@ -1,36 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  StyleSheet,
-  ScrollView,
-  Share,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, Share } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
-import { Tables } from '../../types/database'; // Assuming you have generated types
+import { Invoice, InvoiceItem } from '../../types/database';
 
-type Invoice = Tables<'invoices'>;
-type InvoiceItem = Tables<'invoice_items'>;
-
-const InvoiceDetail = () => {
+export default function InvoiceDetailScreen() {
   const { id } = useLocalSearchParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [items, setItems] = useState<InvoiceItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null);
+  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [paying, setPaying] = useState(false);
+
   useEffect(() => {
-    if (id) {
-      fetchInvoice();
-    }
+    loadInvoice();
   }, [id]);
 
   const fetchInvoice = async () => {
-    setLoading(true);
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
       .select('*')
@@ -39,8 +28,6 @@ const InvoiceDetail = () => {
 
     if (invoiceError) {
       console.error('Error fetching invoice:', invoiceError);
-      Alert.alert('Error', 'Could not fetch invoice details.');
-      setLoading(false);
       return;
     }
 
@@ -53,54 +40,99 @@ const InvoiceDetail = () => {
 
     if (itemsError) {
       console.error('Error fetching invoice items:', itemsError);
-      // Non-critical, so we don't block the UI
       return;
     }
 
     setItems(itemsData || []);
-    setLoading(false);
   };
 
-  const handlePayment = () => {
-    // For now, just log a message to the console.
-    console.log('Payment button pressed for invoice:', id);
-    // In a real application, you would integrate a payment gateway here.
+  const processPayment = async () => {
+    if (!invoice || !profile) return;
+
+    setPaying(true);
+    try {
+      const paymentReference = `PAY-${Date.now()}-${invoice.id.substring(0, 8)}`;
+
+      const { error: paymentError } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: profile.id,
+          type: 'payment',
+          amount: invoice.total_amount,
+          status: 'completed',
+          payment_provider: 'wallet',
+          payment_reference: paymentReference,
+          metadata: {
+            invoice_id: invoice.id,
+            invoice_number: invoice.invoice_number,
+          },
+        });
+
+      if (paymentError) throw paymentError;
+
+      const newBalance = profile.wallet_balance - invoice.total_amount;
+      if (newBalance < 0) {
+        throw new Error('Insufficient wallet balance');
+      }
+
+      const { error: balanceError } = await supabase
+        .from('profiles')
+        .update({ wallet_balance: newBalance })
+        .eq('id', profile.id);
+
+      if (balanceError) throw balanceError;
+
+      const { error: invoiceError } = await supabase
+        .from('invoices')
+        .update({
+          status: 'paid',
+          customer_id: profile.id,
+          paid_at: new Date().toISOString(),
+          payment_reference: paymentReference,
+        })
+        .eq('id', invoice.id);
+
+      if (invoiceError) throw invoiceError;
+
+      Alert.alert(
+        'Payment Successful',
+        'Your payment has been received. The merchant will ship your order soon.',
+        [{ text: 'OK', onPress: () => loadInvoice() }]
+      );
+    } catch (error: any) {
+      Alert.alert('Payment Failed', error.message || 'Failed to process payment');
+    } finally {
+      setPaying(false);
+    }
   };
 
   const handleShare = async () => {
     try {
-      // For production, you should use a proper deep link like 'paynship://invoice/[id]'
-      // and configure the scheme in app.json.
       const result = await Share.share({
-        message: `View your Paynship invoice #${invoice?.invoice_code}. Open with this link: paynship://invoice/${id}`,
-        title: `Paynship Invoice #${invoice?.invoice_code}`,
+        message: `View your invoice at: exp://${process.env.EXPO_PUBLIC_HOST}/invoice/${id}`,
       });
     } catch (error) {
-      Alert.alert('Error', 'Could not share invoice.');
+      console.error('Error sharing invoice:', error);
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
+  if (!invoice) {
+    return <Text>Loading...</Text>;
   }
-  if (!invoice && !loading) {
-    return (
-      <View style={styles.centered}>
-        <Text>Invoice not found.</Text>
-      </View>
-    );
-  }
+
+  const styles = getStyles(colors);
+  const isMerchant = profile?.id === invoice.merchant_id;
+  const canPay =
+    invoice.status === 'pending_payment' &&
+    profile &&
+    profile.wallet_balance >= invoice.total_amount;
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Invoice #{invoice.invoice_code}</Text>
 
       <View style={styles.detailsContainer}>
-        <Text>Total Amount: ${Number(invoice.total_amount).toFixed(2)}</Text>
+        <Text>Total Amount: ${invoice.total_amount.toFixed(2)}</Text>
         <Text>Status: {invoice.payment_status}</Text>
         <Text>Escrow Status: {invoice.escrow_status}</Text>
       </View>
@@ -110,38 +142,32 @@ const InvoiceDetail = () => {
         <View key={item.id} style={styles.itemContainer}>
           <Text>{item.description}</Text>
           <Text>Quantity: {item.quantity}</Text>
-          <Text>Price: ${Number(item.price).toFixed(2)}</Text>
+          <Text>Price: ${item.price.toFixed(2)}</Text>
         </View>
       ))}
 
       {invoice.payment_status === 'pending' && (
         <Button title="Pay Now" onPress={handlePayment} />
       )}
-      {invoice.payment_status === 'pending' &&
-        invoice.escrow_status === 'pending' && (
-          <View style={{ marginTop: 10 }}>
-            <Button
-              title="Pay with Escrow"
-              onPress={() => router.push(`/invoice/escrow/${id}`)}
-            />
-          </View>
-        )}
+      {invoice.payment_status === 'pending' && invoice.escrow_status === 'pending' && (
+        <View style={{ marginTop: 10 }}>
+          <Button
+            title="Pay with Escrow"
+            onPress={() => router.push(`/invoice/escrow/${id}`)}
+          />
+        </View>
+      )}
       <View style={{ marginTop: 20 }}>
         <Button title="Share" onPress={handleShare} />
       </View>
     </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   title: {
     fontSize: 24,
@@ -166,5 +192,3 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
 });
-
-export default InvoiceDetail;
