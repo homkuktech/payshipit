@@ -13,7 +13,13 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { UserPlus, ShoppingBag, Bike, Store } from 'lucide-react-native';
+import {
+  UserPlus,
+  ShoppingBag,
+  Bike,
+  Store,
+  Package,
+} from 'lucide-react-native';
 import { UserRole } from '@/types/database';
 
 interface RoleOption {
@@ -29,7 +35,7 @@ export default function SignupScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('sender');
+  const [role, setRole] = useState<UserRole>('customer');
   const [loading, setLoading] = useState(false);
 
   const { signUpWithEmail } = useAuth();
@@ -38,22 +44,45 @@ export default function SignupScreen() {
 
   const roleOptions: RoleOption[] = [
     {
-      value: 'sender',
+      value: 'customer',
       label: 'Customer',
-      description: 'Send packages',
-      icon: <ShoppingBag size={24} color={role === 'sender' ? '#ffffff' : colors.text} />,
+      description: 'Receive & track items',
+      icon: (
+        <Package
+          size={24}
+          color={role === 'customer' ? '#ffffff' : colors.text}
+        />
+      ),
+    },
+    {
+      value: 'sender',
+      label: 'Sender',
+      description: 'Send packages P2P',
+      icon: (
+        <ShoppingBag
+          size={24}
+          color={role === 'sender' ? '#ffffff' : colors.text}
+        />
+      ),
     },
     {
       value: 'rider',
       label: 'Rider',
       description: 'Deliver packages',
-      icon: <Bike size={24} color={role === 'rider' ? '#ffffff' : colors.text} />,
+      icon: (
+        <Bike size={24} color={role === 'rider' ? '#ffffff' : colors.text} />
+      ),
     },
     {
       value: 'merchant',
       label: 'Merchant',
       description: 'Business account',
-      icon: <Store size={24} color={role === 'merchant' ? '#ffffff' : colors.text} />,
+      icon: (
+        <Store
+          size={24}
+          color={role === 'merchant' ? '#ffffff' : colors.text}
+        />
+      ),
     },
   ];
 

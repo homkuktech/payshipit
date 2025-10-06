@@ -9,7 +9,6 @@ import SplashScreen from '@/components/SplashScreen';
 export default function Index() {
   const { session, loading: authLoading } = useAuth();
   const { hasSeenOnboarding, loading: onboardingLoading } = useOnboarding();
-  const { colors } = useTheme();
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
@@ -20,12 +19,33 @@ export default function Index() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (showSplash || authLoading || onboardingLoading) {
+  // The auth context should also provide the user profile
+  const { profile, loading: profileLoading } = useAuth();
+
+  if (
+    showSplash ||
+    authLoading ||
+    onboardingLoading ||
+    (session && profileLoading)
+  ) {
     return <SplashScreen />;
   }
 
-  if (session) {
-    return <Redirect href="/(tabs)" />;
+  if (session && profile) {
+    // Role-based redirection
+    switch (profile.role) {
+      case 'customer':
+        return <Redirect href="/(customer)" />;
+      case 'sender':
+        return <Redirect href="/(sender)" />;
+      case 'rider':
+        return <Redirect href="/(rider)" />;
+      case 'merchant':
+        return <Redirect href="/(merchant)" />;
+      default:
+        // Fallback to a default or show an error
+        return <Redirect href="/(auth)/login" />;
+    }
   }
 
   if (!hasSeenOnboarding) {

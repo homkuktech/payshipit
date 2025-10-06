@@ -1,12 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Button,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Alert,
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { Invoice } from '../../../types/database';
+import { Tables } from '../../../types/database';
+
+type Invoice = Tables<'invoices'>;
 
 const EscrowPayment = () => {
   const { id } = useLocalSearchParams();
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,15 +43,20 @@ const EscrowPayment = () => {
   const handleFundEscrow = async () => {
     if (!invoice) return;
 
-    const { error: escrowError } = await supabase.from('escrow_transactions').insert([
-      {
-        invoice_id: invoice.id,
-        amount: invoice.total_amount,
-      },
-    ]);
+    setLoading(true);
+    const { error: escrowError } = await supabase
+      .from('escrow_transactions')
+      .insert([
+        {
+          invoice_id: invoice.id,
+          amount: invoice.total_amount,
+        },
+      ]);
 
     if (escrowError) {
       console.error('Error funding escrow:', escrowError);
+      Alert.alert('Error', 'Could not fund escrow. Please try again.');
+      setLoading(false);
       return;
     }
 
@@ -51,10 +67,16 @@ const EscrowPayment = () => {
 
     if (invoiceError) {
       console.error('Error updating invoice status:', invoiceError);
+      Alert.alert(
+        'Error',
+        'Escrow was funded, but failed to update invoice status. Please contact support.'
+      );
+      setLoading(false);
       return;
     }
 
-    router.push(`/invoice/${invoice.id}`);
+    Alert.alert('Success', 'Escrow has been funded!');
+    router.replace(`/invoice/${invoice.id}`);
   };
 
   if (!invoice) {
@@ -63,13 +85,19 @@ const EscrowPayment = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Fund Escrow for Invoice #{invoice.invoice_code}</Text>
+      <Text style={styles.title}>
+        Fund Escrow for Invoice #{invoice.invoice_code}
+      </Text>
 
       <View style={styles.detailsContainer}>
-        <Text>Total Amount: ${invoice.total_amount.toFixed(2)}</Text>
+        <Text>Total Amount: ${Number(invoice.total_amount).toFixed(2)}</Text>
       </View>
 
-      <Button title="Fund Escrow" onPress={handleFundEscrow} />
+      {loading ? (
+        <ActivityIndicator size="large" />
+      ) : (
+        <Button title="Fund Escrow" onPress={handleFundEscrow} />
+      )}
     </ScrollView>
   );
 };

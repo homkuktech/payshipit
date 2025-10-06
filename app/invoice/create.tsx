@@ -1,67 +1,128 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import { supabase } from '../../lib/supabase';
 
+interface InvoiceItemState {
+  description: string;
+  quantity: number;
+  price: number;
+}
+
 const CreateInvoice = () => {
-  const [customerName, setCustomerName] = useState('');
+  const [customerName, setCustomerName] = useState(''); // These can be part of a larger form state object
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  const [items, setItems] = useState([{ description: '', quantity: 1, price: 0 }]);
+  const [items, setItems] = useState<InvoiceItemState[]>([
+    { description: '', quantity: 1, price: 0 },
+  ]);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleAddItem = () => {
     setItems([...items, { description: '', quantity: 1, price: 0 }]);
   };
 
-  const handleItemChange = (index, field, value) => {
+  const handleItemChange = (
+    index: number,
+    field: keyof InvoiceItemState,
+    value: string | number
+  ) => {
     const newItems = [...items];
-    newItems[index][field] = value;
+    // @ts-ignore
+    newItems[index][field] = value; // Basic update, can be improved with type guards
     setItems(newItems);
   };
 
-  const calculateTotal = () => {
+  const totalAmount = useMemo(() => {
     return items.reduce((total, item) => total + item.quantity * item.price, 0);
-  };
+  }, [items]);
 
   const handleSubmit = async () => {
-    const totalAmount = calculateTotal();
-    const { data: invoice, error } = await supabase
+    if (loading) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      Alert.alert('Error', 'You must be logged in to create an invoice.');
+      return;
+    }
+
+    if (
+      items.some(
+        (item) => !item.description || item.quantity <= 0 || item.price <= 0
+      )
+    ) {
+      Alert.alert(
+        'Invalid Item',
+        'Please ensure all invoice items have a description, and quantity/price are greater than zero.'
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoices')
       .insert([
         {
-          user_id: (await supabase.auth.getUser()).data.user?.id,
+          user_id: user.id,
           invoice_code: `INV-${Date.now()}`,
           total_amount: totalAmount,
           payment_status: 'pending',
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
         },
       ])
-      .select();
+      .select()
+      .single();
 
-    if (error || !invoice) {
-      console.error('Error creating invoice:', error);
+    if (invoiceError || !invoiceData) {
+      console.error('Error creating invoice:', invoiceError);
+      Alert.alert('Error', 'Failed to create invoice. Please try again.');
+      setLoading(false);
       return;
     }
 
     const invoiceItems = items.map((item) => ({
-      invoice_id: invoice[0].id,
+      invoice_id: invoiceData.id,
       ...item,
     }));
 
-    const { error: itemsError } = await supabase.from('invoice_items').insert(invoiceItems);
+    const { error: itemsError } = await supabase
+      .from('invoice_items')
+      .insert(invoiceItems);
 
     if (itemsError) {
+      // Attempt to clean up the created invoice if items fail to insert
+      await supabase.from('invoices').delete().eq('id', invoiceData.id);
       console.error('Error creating invoice items:', itemsError);
+      Alert.alert('Error', 'Failed to save invoice items. Please try again.');
+      setLoading(false);
       return;
     }
 
-    router.push(`/invoice/${invoice[0].id}`);
+    setLoading(false);
+    Alert.alert('Success', 'Invoice created successfully!');
+    router.push(`/invoice/${invoiceData.id}`);
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Create Invoice</Text>
 
+      <Text style={styles.label}>Customer Information</Text>
       <TextInput
         style={styles.input}
         placeholder="Customer Name"
@@ -89,21 +150,27 @@ const CreateInvoice = () => {
           <TextInput
             style={styles.itemInput}
             placeholder="Description"
-            value={item.description}
-            onChangeText={(value) => handleItemChange(index, 'description', value)}
+            value={item.description || ''}
+            onChangeText={(value) =>
+              handleItemChange(index, 'description', value)
+            }
           />
           <TextInput
-            style={styles.itemInput}
+            style={[styles.itemInput, styles.quantityInput]}
             placeholder="Quantity"
             value={String(item.quantity)}
-            onChangeText={(value) => handleItemChange(index, 'quantity', Number(value))}
+            onChangeText={(value) =>
+              handleItemChange(index, 'quantity', Number(value) || 0)
+            }
             keyboardType="numeric"
           />
           <TextInput
-            style={styles.itemInput}
+            style={[styles.itemInput, styles.priceInput]}
             placeholder="Price"
             value={String(item.price)}
-            onChangeText={(value) => handleItemChange(index, 'price', Number(value))}
+            onChangeText={(value) =>
+              handleItemChange(index, 'price', Number(value) || 0)
+            }
             keyboardType="numeric"
           />
         </View>
@@ -111,9 +178,15 @@ const CreateInvoice = () => {
 
       <Button title="Add Item" onPress={handleAddItem} />
 
-      <Text style={styles.total}>Total: ${calculateTotal().toFixed(2)}</Text>
+      <Text style={styles.total}>Total: ${totalAmount.toFixed(2)}</Text>
 
-      <Button title="Create Invoice" onPress={handleSubmit} />
+      <View style={styles.submitButton}>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Button title="Create Invoice" onPress={handleSubmit} color="#fff" />
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -134,6 +207,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     marginBottom: 10,
   },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 5,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -152,13 +230,26 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 5,
     flex: 1,
-    marginRight: 5,
+  },
+  quantityInput: {
+    flex: 0.5,
+    marginHorizontal: 5,
+  },
+  priceInput: {
+    flex: 0.6,
   },
   total: {
     fontSize: 20,
     fontWeight: 'bold',
     marginTop: 20,
+    marginBottom: 20,
     textAlign: 'right',
+  },
+  submitButton: {
+    backgroundColor: '#2563eb', // primary blue from your theme
+    padding: 5,
+    borderRadius: 5,
+    marginTop: 10,
   },
 });
 
