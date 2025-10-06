@@ -80,6 +80,10 @@ export default function RootLayout() {
             name="chat/create"
             options={{ presentation: 'modal', title: 'New Chat' }}
           />
+          <Stack.Screen
+            name="chat/[id]/add-participants"
+            options={{ presentation: 'modal', title: 'Add Participants' }}
+          />
           <Stack.Screen name="invoice/[id]" />
           <Stack.Screen name="invoice/escrow/[id]" />
           <Stack.Screen name="invoice/escrow/available" />

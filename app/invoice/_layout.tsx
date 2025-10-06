@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LayoutDashboard, FileText, User, Plus } from 'lucide-react-native';
+import { LayoutDashboard, FileText, User } from 'lucide-react-native';
 
 export default function MerchantLayout() {
   const { colors } = useTheme();
@@ -20,31 +20,15 @@ export default function MerchantLayout() {
     >
       <Tabs.Screen
         name="index" // This would be the merchant dashboard
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color }) => <LayoutDashboard color={color} />,
-        }}
+        options={{ title: 'Dashboard', tabBarIcon: ({ color }) => <LayoutDashboard color={color} /> }}
       />
       <Tabs.Screen
         name="invoices"
-        options={{
-          title: 'Invoices',
-          tabBarIcon: ({ color }) => <FileText color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="create-invoice"
-        options={{
-          title: 'New Invoice',
-          tabBarIcon: ({ color }) => <Plus color={color} />,
-        }}
+        options={{ title: 'Invoices', tabBarIcon: ({ color }) => <FileText color={color} /> }}
       />
       <Tabs.Screen
         name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color }) => <User color={color} />,
-        }}
+        options={{ title: 'Profile', tabBarIcon: ({ color }) => <User color={color} /> }}
       />
     </Tabs>
   );

@@ -8,8 +8,19 @@
     "scheme": "paynship",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "android": {
+      "config": {
+        "googleMaps": {
+          "apiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+        }
+      },
+      "package": "com.anonymous.boltexponativewind"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "googleMapsApiKey": "${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}"
+      }
     },
     "web": {
       "bundler": "metro",

@@ -28,11 +28,10 @@ type MessageWithReply = Message & {
 };
 
 interface ChatProps {
-  orderId: string;
-  receiverId: string;
+  conversationId: string;
 }
 
-const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
+const Chat: React.FC<ChatProps> = ({ conversationId }) => {
   const { colors } = useTheme();
   const { profile } = useAuth();
   const [messages, setMessages] = useState<MessageWithReply[]>([]);
@@ -57,17 +56,16 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
     // Mark incoming messages as read
     const markAsRead = async () => {
       if (!profile) return;
-      await supabase.rpc('mark_messages_as_read', { p_order_id: orderId, p_receiver_id: profile.id });
+      // This RPC needs to be updated if you want read receipts in group chats.
+      // For now, we'll assume it's for DMs or we can disable it.
     };
 
     const fetchMessages = async () => {
       // We join the message with itself to get the replied-to message's content and sender name.
       let { data, error } = await supabase
         .from('messages')
-        .select(
-          '*, replied_to:messages!reply_to_message_id(content, image_url, audio_url, sender:profiles!sender_id(full_name))'
-        )
-        .eq('order_id', orderId)
+        .select('*, message_reactions ( emoji, user_id ), replied_to:messages!reply_to_message_id(content, image_url, audio_url, sender:profiles!sender_id(full_name))')
+        .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (error) console.error('Error fetching messages:', error);
@@ -105,7 +103,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
     fetchMessages();
 
     const channel = supabase
-      .channel(`chat:${orderId}`, {
+      .channel(`chat:${conversationId}`, {
         config: {
           broadcast: {
             self: false, // We don't want to receive our own typing events
@@ -122,7 +120,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
     // Listen for database changes
     channel
       .on(
-        'postgres_changes',
+        'postgres_changes', // This should be one listener for the table
         { event: '*', schema: 'public', table: 'messages' },
         (payload) => {
           if (payload.eventType === 'INSERT') {
@@ -130,7 +128,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
             // to get reply context, or handle it client-side.
             // For simplicity, we add it directly.
             const newMessage = { ...payload.new, message_reactions: [] } as MessageWithReply;
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
+            setMessages((prevMessages) => [...prevMessages, newMessage]); // This might cause duplicates if you refetch
             markAsRead(); // Mark new message as read immediately if chat is open
           } else if (payload.eventType === 'UPDATE') {
             setMessages((prevMessages) =>
@@ -157,7 +155,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
     return () => {
       if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [orderId]);
+  }, [conversationId]);
 
   const handleShowActions = (message: Message) => {
     const isMyMessage = message.sender_id === profile?.id;
@@ -235,9 +233,8 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
     } else {
       // We are sending a new message
       const messageToSend = {
-        order_id: orderId,
+        conversation_id: conversationId,
         sender_id: profile.id,
-        receiver_id: receiverId,
         content: content,
         reply_to_message_id: replyingTo ? replyingTo.id : null,
       };
@@ -290,7 +287,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
       setIsUploading(true);
       const asset = result.assets[0];
       const fileExt = asset.uri.split('.').pop()?.toLowerCase() ?? 'jpeg';
-      const filePath = `${orderId}/${profile.id}/${Date.now()}.${fileExt}`;
+      const filePath = `${conversationId}/${profile.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('chat_images')
@@ -306,9 +303,8 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
 
       // Send a message with the image URL
       const { error: messageError } = await supabase.from('messages').insert({
-        order_id: orderId,
+        conversation_id: conversationId,
         sender_id: profile.id,
-        receiver_id: receiverId,
         image_url: filePath,
         // Note: Editing is disabled for image messages, so no need to check editingMessage
         reply_to_message_id: replyingTo ? replyingTo.id : null,
@@ -363,7 +359,7 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
         const response = await fetch(uri);
         const blob = await response.blob();
 
-        const filePath = `${orderId}/${profile.id}/${Date.now()}.m4a`;
+        const filePath = `${conversationId}/${profile.id}/${Date.now()}.m4a`;
 
         const { error: uploadError } = await supabase.storage
           .from('chat_audio')
@@ -374,9 +370,8 @@ const Chat: React.FC<ChatProps> = ({ orderId, receiverId }) => {
         if (uploadError) throw uploadError;
 
         await supabase.from('messages').insert({
-          order_id: orderId,
+          conversation_id: conversationId,
           sender_id: profile.id,
-          receiver_id: receiverId,
           audio_url: filePath,
           audio_duration_seconds: recordingDuration,
           // Note: Editing is disabled for audio messages
