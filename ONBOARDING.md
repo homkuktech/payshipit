@@ -1,8 +1,8 @@
-# Paynship Onboarding & Splash Screen
+# TrusTrade Onboarding & Splash Screen
 
 ## Overview
 
-The Paynship app includes a professional splash screen and comprehensive onboarding experience for new users. This document explains the implementation and customization options.
+The TrusTrade app includes a professional splash screen and comprehensive onboarding experience for new users. This document explains the implementation and customization options.
 
 ## Features
 

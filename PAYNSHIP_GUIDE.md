@@ -1,8 +1,8 @@
-# Paynship - Complete Implementation Guide
+# TrusTrade - Complete Implementation Guide
 
 ## Overview
 
-Paynship is a production-ready logistics and escrow delivery platform built with React Native (Expo), similar to Uber for package delivery. The app connects senders, riders, and merchants with secure payment escrow and real-time tracking.
+TrusTrade is a production-ready logistics and escrow delivery platform built with React Native (Expo), similar to Uber for package delivery. The app connects senders, riders, and merchants with secure payment escrow and real-time tracking.
 
 ## Tech Stack
 

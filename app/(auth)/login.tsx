@@ -72,7 +72,7 @@ export default function LoginScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <LogIn size={48} color={colors.primary} />
-          <Text style={styles.title}>Welcome to Paynship</Text>
+          <Text style={styles.title}>Welcome to TrusTrade</Text>
           <Text style={styles.subtitle}>Login to continue</Text>
         </View>
 
@@ -84,7 +84,12 @@ export default function LoginScreen() {
             ]}
             onPress={() => setLoginMethod('email')}
           >
-            <Mail size={20} color={loginMethod === 'email' ? colors.primary : colors.textSecondary} />
+            <Mail
+              size={20}
+              color={
+                loginMethod === 'email' ? colors.primary : colors.textSecondary
+              }
+            />
             <Text
               style={[
                 styles.methodButtonText,
@@ -102,7 +107,12 @@ export default function LoginScreen() {
             ]}
             onPress={() => setLoginMethod('phone')}
           >
-            <Phone size={20} color={loginMethod === 'phone' ? colors.primary : colors.textSecondary} />
+            <Phone
+              size={20}
+              color={
+                loginMethod === 'phone' ? colors.primary : colors.textSecondary
+              }
+            />
             <Text
               style={[
                 styles.methodButtonText,
@@ -134,6 +144,11 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry
               />
+              <TouchableOpacity
+                onPress={() => router.push('/(auth)/forgot-password')}
+              >
+                <Text style={styles.forgotPasswordLink}>Forgot Password?</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, loading && styles.buttonDisabled]}
                 onPress={handleEmailLogin}
@@ -242,6 +257,12 @@ const getStyles = (colors: any) =>
       padding: 16,
       fontSize: 16,
       color: colors.text,
+    },
+    forgotPasswordLink: {
+      color: colors.primary,
+      textAlign: 'right',
+      fontWeight: '500',
+      paddingVertical: 8,
     },
     button: {
       backgroundColor: colors.primary,

@@ -8,12 +8,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import {
+  ChevronDown,
   UserPlus,
   ShoppingBag,
   Bike,
@@ -37,6 +39,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('customer');
   const [loading, setLoading] = useState(false);
+  const [isRolePickerVisible, setRolePickerVisible] = useState(false);
 
   const { signUpWithEmail } = useAuth();
   const { colors } = useTheme();
@@ -47,42 +50,25 @@ export default function SignupScreen() {
       value: 'customer',
       label: 'Customer',
       description: 'Receive & track items',
-      icon: (
-        <Package
-          size={24}
-          color={role === 'customer' ? '#ffffff' : colors.text}
-        />
-      ),
+      icon: <Package size={24} color={colors.text} />,
     },
     {
       value: 'sender',
       label: 'Sender',
       description: 'Send packages P2P',
-      icon: (
-        <ShoppingBag
-          size={24}
-          color={role === 'sender' ? '#ffffff' : colors.text}
-        />
-      ),
+      icon: <ShoppingBag size={24} color={colors.text} />,
     },
     {
       value: 'rider',
       label: 'Rider',
       description: 'Deliver packages',
-      icon: (
-        <Bike size={24} color={role === 'rider' ? '#ffffff' : colors.text} />
-      ),
+      icon: <Bike size={24} color={colors.text} />,
     },
     {
       value: 'merchant',
       label: 'Merchant',
       description: 'Business account',
-      icon: (
-        <Store
-          size={24}
-          color={role === 'merchant' ? '#ffffff' : colors.text}
-        />
-      ),
+      icon: <Store size={24} color={colors.text} />,
     },
   ];
 
@@ -104,7 +90,10 @@ export default function SignupScreen() {
 
     const phoneRegex = /^\+?[1-9]\d{10,14}$/;
     if (!phoneRegex.test(phone)) {
-      Alert.alert('Error', 'Please enter a valid phone number (e.g., +2348012345678)');
+      Alert.alert(
+        'Error',
+        'Please enter a valid phone number (e.g., +2348012345678)'
+      );
       return;
     }
 
@@ -115,10 +104,16 @@ export default function SignupScreen() {
         phone,
         role,
       });
-      Alert.alert('Success', 'Account created successfully! Welcome to Paynship.');
+      Alert.alert(
+        'Success',
+        'Account created successfully! Welcome to TrusTrade.'
+      );
       router.replace('/(tabs)');
     } catch (error: any) {
-      Alert.alert('Signup Failed', error.message || 'An error occurred during signup');
+      Alert.alert(
+        'Signup Failed',
+        error.message || 'An error occurred during signup'
+      );
     } finally {
       setLoading(false);
     }
@@ -131,53 +126,66 @@ export default function SignupScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
           <UserPlus size={48} color={colors.primary} />
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join Paynship today</Text>
+          <Text style={styles.subtitle}>Join TrusTrade today</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>I am a:</Text>
-            <View style={styles.roleContainer}>
-              {roleOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.roleCard,
-                    role === option.value && styles.roleCardActive,
-                  ]}
-                  onPress={() => setRole(option.value)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[
-                    styles.roleIconContainer,
-                    role === option.value && styles.roleIconContainerActive
-                  ]}>
-                    {option.icon}
-                  </View>
-                  <Text
-                    style={[
-                      styles.roleLabel,
-                      role === option.value && styles.roleLabelActive,
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.roleDescription,
-                      role === option.value && styles.roleDescriptionActive,
-                    ]}
-                  >
-                    {option.description}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity
+              style={styles.roleSelector}
+              onPress={() => setRolePickerVisible(true)}
+            >
+              <Text style={styles.roleSelectorText}>
+                {roleOptions.find((o) => o.value === role)?.label}
+              </Text>
+              <ChevronDown size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
           </View>
+
+          <Modal
+            visible={isRolePickerVisible}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setRolePickerVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setRolePickerVisible(false)}
+            >
+              <View style={styles.modalContent}>
+                {roleOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.roleOption,
+                      role === option.value && styles.roleOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setRole(option.value);
+                      setRolePickerVisible(false);
+                    }}
+                  >
+                    <View style={styles.roleIconContainer}>{option.icon}</View>
+                    <View style={styles.roleTextContainer}>
+                      <Text style={styles.roleLabel}>{option.label}</Text>
+                      <Text style={styles.roleDescription}>
+                        {option.description}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           <TextInput
             style={styles.input}
@@ -290,51 +298,60 @@ const getStyles = (colors: any) =>
       fontWeight: '600',
       color: colors.text,
     },
-    roleContainer: {
+    roleSelector: {
       flexDirection: 'row',
-      gap: 12,
-    },
-    roleCard: {
-      flex: 1,
-      backgroundColor: colors.surface,
-      borderWidth: 2,
-      borderColor: colors.border,
-      borderRadius: 16,
-      padding: 16,
+      justifyContent: 'space-between',
       alignItems: 'center',
-      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      padding: 16,
     },
-    roleCardActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
+    roleSelectorText: {
+      fontSize: 16,
+      color: colors.text,
     },
-    roleIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.background,
+    modalOverlay: {
+      flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.5)',
     },
-    roleIconContainerActive: {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      width: '90%',
+      gap: 8,
     },
+    roleOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 12,
+      borderRadius: 8,
+    },
+    roleOptionSelected: {
+      backgroundColor: colors.primary + '20', // 20 is for ~12% opacity
+    },
+    roleIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    roleTextContainer: {},
     roleLabel: {
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: '600',
       color: colors.text,
-      textAlign: 'center',
-    },
-    roleLabelActive: {
-      color: '#ffffff',
     },
     roleDescription: {
-      fontSize: 11,
+      fontSize: 13,
       color: colors.textSecondary,
-      textAlign: 'center',
-    },
-    roleDescriptionActive: {
-      color: 'rgba(255, 255, 255, 0.8)',
     },
     input: {
       backgroundColor: colors.surface,

@@ -1,140 +1,93 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   ScrollView,
-  Share,
+  TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
 import { Tables } from '@/types/database';
+import { CheckCircle, Package, User, Truck } from 'lucide-react-native';
 
-type Invoice = Tables<'invoices'>;
-type InvoiceItem = Tables<'invoice_items'>;
+type Order = Tables<'orders'>;
 
-export default function InvoiceDetailScreen() {
+export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
-  const { profile } = useAuth();
   const { colors } = useTheme();
+  const { profile } = useAuth();
+  const router = useRouter();
 
-  const [invoice, setInvoice] = useState<Invoice | null>(null);
-  const [items, setItems] = useState<InvoiceItem[]>([]);
+  const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isPaying, setIsPaying] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadInvoice();
-    }
-  }, [id]);
-
-  const loadInvoice = async () => {
-    setLoading(true);
+  const fetchOrder = useCallback(async () => {
     try {
-      const { data: invoiceData, error: invoiceError } = await supabase
-        .from('invoices')
+      const { data, error } = await supabase
+        .from('orders')
         .select('*')
         .eq('id', id as string)
         .single();
 
-      if (invoiceError) throw invoiceError;
-      setInvoice(invoiceData);
-
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('invoice_items')
-        .select('*')
-        .eq('invoice_id', id as string);
-
-      if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+      if (error) throw error;
+      setOrder(data);
     } catch (error) {
-      console.error('Error loading invoice details:', error);
-      Alert.alert('Error', 'Could not load invoice details.');
+      console.error('Error fetching order:', error);
+      Alert.alert('Error', 'Failed to load order details.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [id]);
 
-  const handlePayment = async () => {
-    if (!invoice || !profile) return;
+  useEffect(() => {
+    fetchOrder();
+  }, [fetchOrder]);
 
-    setIsPaying(true);
+  const handleConfirmDelivery = async () => {
+    if (!order) return;
+
+    setIsConfirming(true);
     try {
-      const paymentReference = `PAY-${Date.now()}-${invoice.id.substring(
-        0,
-        8
-      )}`;
+      const { data, error } = await supabase.functions.invoke(
+        'release-escrow',
+        {
+          body: { orderId: order.id },
+        }
+      );
 
-      // 1. Check wallet balance
-      const newBalance = profile.wallet_balance - Number(invoice.total_amount);
-      if (newBalance < 0) {
-        throw new Error('Insufficient wallet balance');
-      }
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
 
-      // 2. Create a transaction record
-      const { error: paymentError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: profile.id,
-          type: 'payment',
-          amount: invoice.total_amount,
-          status: 'successful',
-          payment_provider: 'wallet',
-          payment_reference: paymentReference,
-          metadata: {
-            invoice_id: invoice.id,
-            invoice_code: invoice.invoice_code,
-          },
-        });
-
-      if (paymentError) throw paymentError;
-
-      // 3. Update user's wallet balance
-      const { error: balanceError } = await supabase
-        .from('profiles')
-        .update({ wallet_balance: newBalance })
-        .eq('id', profile.id);
-
-      if (balanceError) throw balanceError;
-
-      // 4. Update the invoice status
-      const { error: invoiceError } = await supabase
-        .from('invoices')
-        .update({ payment_status: 'paid', customer_id: profile.id })
-        .eq('id', invoice.id);
-
-      if (invoiceError) throw invoiceError;
-
-      Alert.alert('Payment Successful', 'Your payment has been received.', [
-        { text: 'OK', onPress: () => loadInvoice() },
-      ]);
+      Alert.alert(
+        'Success',
+        'Delivery confirmed and funds have been released to the rider.'
+      );
+      fetchOrder(); // Refresh order details
     } catch (error: any) {
       Alert.alert(
-        'Payment Failed',
-        error.message || 'Failed to process payment'
+        'Confirmation Failed',
+        error.message || 'An unexpected error occurred.'
       );
     } finally {
-      setIsPaying(false);
+      setIsConfirming(false);
     }
   };
 
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `View your invoice at: exp://${process.env.EXPO_PUBLIC_HOST}/invoice/${id}`,
-      });
-    } catch (error) {
-      console.error('Error sharing invoice:', error);
-      Alert.alert('Error', 'Could not share invoice.');
-    }
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchOrder();
   };
+
+  const styles = getStyles(colors);
 
   if (loading) {
     return (
@@ -144,123 +97,144 @@ export default function InvoiceDetailScreen() {
     );
   }
 
-  if (!invoice) {
+  if (!order) {
     return (
       <View style={styles.centered}>
-        <Text>Invoice not found.</Text>
+        <Text style={styles.errorText}>Order not found.</Text>
       </View>
     );
   }
 
-  const styles = getStyles(colors);
-  const isMerchant = profile?.id === invoice.user_id;
-  const canPay =
-    invoice.payment_status === 'pending' &&
-    profile &&
-    profile.wallet_balance >= Number(invoice.total_amount);
+  const isSender = profile?.id === order.sender_id;
+  const canConfirm = isSender && order.status === 'in_transit';
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Invoice #{invoice.invoice_code}</Text>
-
-      <View style={styles.detailsContainer}>
-        <Text style={styles.detailText}>
-          Total Amount: ${Number(invoice.total_amount).toFixed(2)}
-        </Text>
-        <Text style={styles.detailText}>Status: {invoice.payment_status}</Text>
-        <Text style={styles.detailText}>
-          Escrow Status: {invoice.escrow_status}
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[colors.primary]}
+        />
+      }
+    >
+      <View style={styles.header}>
+        <Package size={32} color={colors.primary} />
+        <Text style={styles.title}>Order Details</Text>
+        <Text style={styles.status(order.status)}>
+          {order.status.replace('_', ' ')}
         </Text>
       </View>
 
-      <Text style={styles.subtitle}>Invoice Items</Text>
-      {items.map((item) => (
-        <View key={item.id} style={styles.itemContainer}>
-          <Text style={styles.itemDescription}>{item.description}</Text>
-          <Text style={styles.itemDetails}>Qty: {item.quantity}</Text>
-          <Text style={styles.itemDetails}>
-            @ ${Number(item.price).toFixed(2)}
-          </Text>
-        </View>
-      ))}
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>Package Information</Text>
+        <Text style={styles.detailText}>
+          Description: {order.package_description}
+        </Text>
+        <Text style={styles.detailText}>
+          Value: ${Number(order.package_value).toFixed(2)}
+        </Text>
+      </View>
 
-      {!isMerchant && canPay && (
-        <>
-          <Button
-            title={isPaying ? 'Processing...' : 'Pay with Wallet'}
-            onPress={handlePayment}
-            disabled={isPaying}
-          />
-          {invoice.escrow_status === 'pending' && (
-            <View style={{ marginTop: 10 }}>
-              <Button
-                title="Pay with Escrow"
-                onPress={() => router.push(`/invoice/escrow/${id}`)}
-                disabled={isPaying}
-              />
-            </View>
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>Recipient</Text>
+        <Text style={styles.detailText}>Name: {order.recipient_name}</Text>
+        <Text style={styles.detailText}>Phone: {order.recipient_phone}</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.subtitle}>Delivery</Text>
+        <Text style={styles.detailText}>From: {order.pickup_address}</Text>
+        <Text style={styles.detailText}>To: {order.dropoff_address}</Text>
+        <Text style={styles.detailText}>
+          Fee: ${Number(order.delivery_fee).toFixed(2)}
+        </Text>
+      </View>
+
+      {canConfirm && (
+        <TouchableOpacity
+          style={[styles.button, isConfirming && styles.buttonDisabled]}
+          onPress={handleConfirmDelivery}
+          disabled={isConfirming}
+        >
+          {isConfirming ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <>
+              <CheckCircle size={20} color="#ffffff" />
+              <Text style={styles.buttonText}>Confirm Delivery</Text>
+            </>
           )}
-        </>
+        </TouchableOpacity>
       )}
-
-      <View style={{ marginTop: 20 }}>
-        <Button title="Share" onPress={handleShare} />
-      </View>
     </ScrollView>
   );
 }
 
+const getStatusColor = (status: string, colors: any) => {
+  switch (status) {
+    case 'completed':
+      return colors.success;
+    case 'in_transit':
+      return colors.warning;
+    case 'cancelled':
+      return colors.danger;
+    default:
+      return colors.textSecondary;
+  }
+};
+
 const getStyles = (colors: any) =>
   StyleSheet.create({
-    container: {
-      flex: 1,
-      padding: 20,
-      backgroundColor: colors.background,
-    },
+    container: { flex: 1, backgroundColor: colors.background, padding: 24 },
     centered: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: colors.background,
     },
+    errorText: { color: colors.danger, fontSize: 16 },
+    header: { alignItems: 'center', paddingTop: 60, paddingBottom: 24 },
     title: {
-      fontSize: 24,
+      fontSize: 28,
       fontWeight: 'bold',
-      marginBottom: 20,
       color: colors.text,
+      marginVertical: 8,
     },
-    detailsContainer: {
-      marginBottom: 20,
-      padding: 16,
+    status: (status: string) => ({
+      fontSize: 14,
+      fontWeight: '600',
+      color: getStatusColor(status, colors),
+      backgroundColor: `${getStatusColor(status, colors)}20`,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderRadius: 20,
+      textTransform: 'uppercase',
+    }),
+    section: {
       backgroundColor: colors.surface,
-      borderRadius: 8,
-    },
-    detailText: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginBottom: 4,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
     },
     subtitle: {
       fontSize: 18,
-      fontWeight: 'bold',
-      marginTop: 20,
-      marginBottom: 10,
+      fontWeight: '600',
       color: colors.text,
+      marginBottom: 12,
     },
-    itemContainer: {
+    detailText: { fontSize: 16, color: colors.textSecondary, marginBottom: 6 },
+    button: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingBottom: 10,
+      backgroundColor: colors.success,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      marginTop: 16,
     },
-    itemDescription: {
-      flex: 1,
-      color: colors.text,
-    },
-    itemDetails: {
-      color: colors.textSecondary,
-      marginLeft: 16,
-    },
+    buttonText: { color: '#ffffff', fontSize: 16, fontWeight: '600' },
+    buttonDisabled: { opacity: 0.7 },
   });
